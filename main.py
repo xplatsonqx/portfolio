@@ -49,10 +49,11 @@ def drawing_histogram_kde(series, name):
 pd.set_option("display.max_rows", 100)
 pd.set_option("display.max_columns", None)
 
-mode = [1]
+mode = [2]
 ##[0] column names (classified as NUMERIC, CATEGORICAL and DATE for further analyse)
 ##[1] numeric columns analysis
 ##[2]
+
 # =========================
 # LOAD DATA
 # =========================
@@ -62,6 +63,7 @@ df = pd.read_csv(
     sep=";",
     low_memory=False
 )
+
 # =========================
 # COLUMN CLASSIFICATION
 # =========================
@@ -98,6 +100,7 @@ if 0 in mode:
 # =========================
 # ANALYSIS
 # =========================
+
 if 1 in mode:
     for col in num_col:
         series = pd.to_numeric(df[col], errors='coerce').dropna()
@@ -127,3 +130,56 @@ if 1 in mode:
 
         plt.tight_layout()
         plt.show()
+# =========================
+# NUMERICAL COLUMNS
+
+# 1. Patient name
+# 1.1 Histogram – kluczowe obserwacje:
+# - Rozkład płaski (brak piku)
+# - wartości występują z podobną częstością
+# - Brak koncentracji danych
+# - nie ma zakresów, gdzie dane się „zbierają”
+# - pełne pokrycie zakresu (~0–10 000)
+# - brak luk, dane równomiernie rozłożone
+# - Brak skośności (symetria)
+# - brak ogonów w lewo/prawo
+# - Brak widocznych anomalii
+# - żadnych ekstremalnych koszy
+# - sugestia rozkładu jednostajnego (uniform)
+# - dane przypominają losowe rozłożenie
+#
+#  1.2 Boxplot – kluczowe obserwacje
+#  - Mediana ≈ środek zakresu (~5000)
+#  - silna symetria danych
+#  - Q1 ≈ 2500, Q3 ≈ 7500
+#  - środkowe 50% danych zajmuje dużą część zakresu
+#  - Duży i równomierny IQR
+#  - brak skupienia wokół jednej wartości
+#  - Symetryczne wąsy (min–max)
+#  - brak przesunięcia rozkładu
+#  - Brak outlierów
+#  - żadnych obserwacji odstających
+#
+#
+#  1.3 Wnioski analityczne
+#  - dane losowe / syntetyczne
+#  - identyfikator (ID, indeks)
+#  - zmienną o niskiej wartości informacyjnej
+#  - „Zbyt idealny” rozkład to potencjalna czerwona flaga w danych rzeczywistych
+#W
+# =========================
+
+if 2 in mode:
+    def show_data(df,column):
+        print(f"\n{num_col[column]}:")
+        print("Ile rekordów: ",series.count(),"\n")
+        print("Ile unikalnych:", series.nunique(), "\n")
+        print("Min:",df.min(),"Max:",df.max(),"\n")
+        print("Średnia:",df.mean(), "Mediana:", df.median())
+
+    series = pd.to_numeric(df[num_col[0]], errors='coerce')
+    show_data(series, 0)
+
+
+
+
