@@ -1,5 +1,5 @@
 # Automated Exploratory Data Analysis Tool
-
+Automated EDA tool that reduces manual data analysis time by generating statistical summaries and visualizations in seconds.
 ## 🔍 Overview
 
 This project is an object-oriented Python tool designed to automate exploratory data analysis (EDA) for structured CSV datasets.
@@ -27,7 +27,7 @@ It loads data, classifies columns, performs statistical analysis, and generates 
 
 ---
 
-## 📊 Example output
+## Example output
 
 ### Summary report
 
@@ -42,7 +42,7 @@ The tool generates a CSV file containing descriptive statistics for numeric colu
 
 ---
 
-## ▶️ How to run
+## How to run
 
 ```bash
 pip install -r requirements.txt
@@ -51,7 +51,7 @@ python src/main.py
 
 ---
 
-## 📁 Project structure
+## Project structure
 
 ```
 portfolio/
@@ -63,15 +63,18 @@ portfolio/
 
 ---
 
-## 💡 Motivation
+## Motivation
 
 Exploratory data analysis is often repetitive.
 This project demonstrates how to automate core EDA tasks using an object-oriented approach.
 
 ---
 
-## 📌 Future improvements
+## Future improvements
 
 * support for categorical analysis
 * correlation heatmaps
 * automated report generation (PDF)
+
+## Sample visualizations
+![](/Users/mateuszplata/PycharmProjects/Portfolio/outputs/plots/Salary_boxplot.png)
