@@ -403,7 +403,18 @@ class ReportGenerator:
             """
 <script>
 function saveReport() {
-  const html = "<!doctype html>\\n" + document.documentElement.outerHTML;
+  // textarea values are not reflected in outerHTML; write them back before saving
+  const docClone = document.documentElement.cloneNode(true);
+  const srcTextareas = document.querySelectorAll("textarea");
+  const dstTextareas = docClone.querySelectorAll("textarea");
+  const n = Math.min(srcTextareas.length, dstTextareas.length);
+  for (let i = 0; i < n; i++) {
+    const val = srcTextareas[i].value ?? "";
+    dstTextareas[i].textContent = val;
+    dstTextareas[i].setAttribute("data-saved-value", val);
+  }
+
+  const html = "<!doctype html>\\n" + docClone.outerHTML;
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
