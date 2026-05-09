@@ -2,22 +2,43 @@ from __future__ import annotations
 
 import base64
 import html
+from io import BytesIO
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import pandas as pd
 
 
 class ReportGenerator:
-    def __init__(self, output_dir: Path, plots_dir: Path):
+    def __init__(self, output_dir: Path):
         self.output_dir = output_dir
-        self.plots_dir = plots_dir
 
-    def _img_to_data_uri(self, path: Path) -> str | None:
-        if not path.exists():
-            return None
-        data = path.read_bytes()
+    def _img_to_data_uri(self, data: bytes) -> str:
         b64 = base64.b64encode(data).decode("ascii")
         return f"data:image/png;base64,{b64}"
+
+    def _plot_data_uri(self, series: pd.Series, kind: str) -> str | None:
+        clean_series = series.dropna()
+        if clean_series.empty:
+            return None
+
+        plt.figure(figsize=(10, 6) if kind == "hist" else (8, 6))
+        if kind == "hist":
+            plt.hist(clean_series, bins=30)
+            plt.xlabel(series.name or "")
+            plt.ylabel("Frequency")
+            plt.title(f"Distribution of {series.name}")
+        else:
+            plt.boxplot(clean_series, vert=True)
+            plt.ylabel(series.name or "")
+            plt.title(f"Boxplot of {series.name}")
+
+        buff = BytesIO()
+        plt.savefig(buff, bbox_inches="tight", format="png")
+        plt.close()
+        return self._img_to_data_uri(buff.getvalue())
 
     def _col_stats_table_html(self, summary: pd.DataFrame, column: str) -> str:
         if column not in summary.index:
@@ -125,7 +146,6 @@ class ReportGenerator:
         report_name: str = "report.html",
     ) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.plots_dir.mkdir(parents=True, exist_ok=True)
 
         title = "EDA"
         parts: list[str] = []
@@ -171,6 +191,20 @@ class ReportGenerator:
       font-size: 22px;
       margin: 0;
       letter-spacing: 0.2px;
+    }}
+    .header-actions {{
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }}
+    .save-btn {{
+      border: 1px solid var(--border);
+      background: #1f2937;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
     }}
     .meta {{
       color: var(--muted);
@@ -294,7 +328,10 @@ class ReportGenerator:
   <div class="container">
     <div class="header">
       <h1>{html.escape(title)}</h1>
-      <div class="meta">Rows: {len(df)} &nbsp;|&nbsp; Numerical columns: {len(numerical_columns)} &nbsp;|&nbsp; Categorical columns: {len(categorical_columns)}</div>
+      <div class="header-actions">
+        <button class="save-btn" onclick="saveReport()">Zapisz raport</button>
+        <div class="meta">Rows: {len(df)} &nbsp;|&nbsp; Numerical columns: {len(numerical_columns)} &nbsp;|&nbsp; Categorical columns: {len(categorical_columns)}</div>
+      </div>
     </div>
 """
         )
@@ -302,10 +339,8 @@ class ReportGenerator:
         parts.append("<div class='section'><h2>Numerical Analysis</h2><div class='cols'>")
 
         for col in numerical_columns:
-            hist_path = self.plots_dir / f"{col}_histogram.png"
-            box_path = self.plots_dir / f"{col}_boxplot.png"
-            hist_uri = self._img_to_data_uri(hist_path)
-            box_uri = self._img_to_data_uri(box_path)
+            hist_uri = self._plot_data_uri(df[col], kind="hist")
+            box_uri = self._plot_data_uri(df[col], kind="box")
 
             hist_html = (
                 f"<img alt='Histogram {html.escape(col)}' src='{hist_uri}' />"
@@ -364,6 +399,24 @@ class ReportGenerator:
                 parts.append(self._corr_table_html(corr_spearman))
             parts.append("</div>")
 
+        parts.append(
+            """
+<script>
+function saveReport() {
+  const html = "<!doctype html>\\n" + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "EDA_report.html";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+</script>
+"""
+        )
         parts.append("</div></body></html>")
 
         report_path = self.output_dir / report_name
