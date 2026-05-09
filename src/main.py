@@ -13,8 +13,7 @@ def main():
 
     # ścieżki
     data_path = base_dir / "data" / "DrugSalesData.csv"
-    output_dir = base_dir / "outputs"
-    output_dir.mkdir(exist_ok=True)
+    report_path = base_dir / "EDA_report.html"
 
     # load data
     loader = DataLoader(data_path)
@@ -37,7 +36,7 @@ def main():
     corr_spearman = analyzer.correlations(method="spearman")
 
     # HTML report
-    report = ReportGenerator(output_dir=output_dir)
+    report = ReportGenerator(output_dir=base_dir)
     report_path = report.write_html_report(
         df=df,
         numerical_columns=numerical_cols,
@@ -45,6 +44,7 @@ def main():
         summary=summary,
         corr_pearson=corr_pearson,
         corr_spearman=corr_spearman,
+        report_name=report_path.name,
     )
 
     print(f"Only output generated: {report_path.resolve()}")
