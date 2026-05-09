@@ -11,7 +11,7 @@ It loads data, classifies columns, performs statistical analysis, and generates 
 ## 🚀 Features
 
 * automatic dataset loading
-* numeric and categorical column detection
+* numerical and categorical column detection
 * statistical summary (mean, std, quartiles)
 * missing values analysis
 * histogram and boxplot generation
@@ -31,7 +31,7 @@ It loads data, classifies columns, performs statistical analysis, and generates 
 
 ### Summary report
 
-The tool generates a CSV file containing descriptive statistics for numeric columns.
+The tool generates a CSV file containing descriptive statistics for numerical columns.
 
 ### Visualizations
 

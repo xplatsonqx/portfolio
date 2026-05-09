@@ -1,12 +1,13 @@
 import pandas as pd
 
-class NumericAnalyzer:
-    def __init__(self, df: pd.DataFrame, numeric_columns: list[str]):
+
+class NumericalAnalyzer:
+    def __init__(self, df: pd.DataFrame, numerical_columns: list[str]):
         self.df = df
-        self.numeric_columns = numeric_columns
+        self.numerical_columns = numerical_columns
 
     def summarize(self) -> pd.DataFrame:
-        df_num = self.df[self.numeric_columns]
+        df_num = self.df[self.numerical_columns]
         summary = df_num.describe().T
 
         n_rows = len(df_num)
@@ -42,5 +43,5 @@ class NumericAnalyzer:
         return summary
 
     def correlations(self, method: str = "pearson") -> pd.DataFrame:
-        df_num = self.df[self.numeric_columns]
+        df_num = self.df[self.numerical_columns]
         return df_num.corr(method=method)
