@@ -31,6 +31,8 @@ class NumericalAnalyzer:
         q1 = df_num.quantile(0.25)
         q3 = df_num.quantile(0.75)
         iqr = q3 - q1
+        summary["q1"] = q1
+        summary["q3"] = q3
         summary["iqr"] = iqr
 
         lower = q1 - 1.5 * iqr

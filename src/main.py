@@ -1,11 +1,11 @@
 from pathlib import Path
+import platform
+import subprocess
 from data_loader import DataLoader
 from dataset_column_classifier import ColumnClassifier
 from numerical_analyzer import NumericalAnalyzer
 from report_generator import ReportGenerator
-
-import webbrowser
-
+from column_profiler import profile_columns
 
 def main():
     # baza projektu
@@ -19,15 +19,13 @@ def main():
     loader = DataLoader(data_path)
     df = loader.load()
 
-    print(f"Dataset shape: {df.shape}")
-
-    # classify columns
-    classifier = ColumnClassifier(df)
-    numerical_cols = classifier.get_numerical_columns()
-    categorical_cols = classifier.get_categorical_columns()
-
-    print(f"Numerical columns: {len(numerical_cols)}")
-    print(f"Categorical columns: {len(categorical_cols)}")
+    # profile columns (dtype + inferred role)
+    col_profile = profile_columns(df)
+    numerical_cols = col_profile.loc[col_profile["role"] == "numerical", "column"].tolist()
+    categorical_cols = col_profile.loc[col_profile["role"] == "categorical", "column"].tolist()
+    # include booleans in categorical-style section
+    categorical_cols += col_profile.loc[col_profile["role"] == "boolean", "column"].tolist()
+    datetime_cols = col_profile.loc[col_profile["role"] == "datetime", "column"].tolist()
 
     # analyze numerical data
     analyzer = NumericalAnalyzer(df, numerical_cols)
@@ -41,14 +39,26 @@ def main():
         df=df,
         numerical_columns=numerical_cols,
         categorical_columns=categorical_cols,
+        datetime_columns=datetime_cols,
+        column_profile=col_profile,
         summary=summary,
         corr_pearson=corr_pearson,
         corr_spearman=corr_spearman,
         report_name=report_path.name,
     )
 
-    print(f"Only output generated: {report_path.resolve()}")
-    webbrowser.open(report_path.resolve().as_uri())
+    # Open report quietly after run (F5 workflow), without terminal noise.
+    try:
+        system = platform.system()
+        if system == "Darwin":
+            subprocess.run(["open", str(report_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        elif system == "Windows":
+            subprocess.run(["cmd", "/c", "start", "", str(report_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        else:
+            subprocess.run(["xdg-open", str(report_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    except Exception:
+        # Keep execution silent and non-blocking if opener is unavailable.
+        pass
 
 if __name__ == "__main__":
     main()
