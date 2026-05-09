@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from visualizer import Visualizer
 from data_loader import DataLoader
 from dataset_column_classifier import ColumnClassifier

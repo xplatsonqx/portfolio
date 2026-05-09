@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 class NumericAnalyzer:
     def __init__(self, df: pd.DataFrame, numeric_columns: list[str]):
         self.df = df
