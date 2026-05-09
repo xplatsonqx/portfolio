@@ -6,8 +6,41 @@ class NumericAnalyzer:
         self.numeric_columns = numeric_columns
 
     def summarize(self) -> pd.DataFrame:
-        summary = self.df[self.numeric_columns].describe().T
+        df_num = self.df[self.numeric_columns]
+        summary = df_num.describe().T
 
-        summary["missing_values"] = self.df[self.numeric_columns].isnull().sum()
+        n_rows = len(df_num)
+
+        missing_values = df_num.isnull().sum()
+        summary["missing_values"] = missing_values
+        summary["missing_pct"] = (missing_values / n_rows * 100.0) if n_rows else 0.0
+
+        unique = df_num.nunique(dropna=True)
+        summary["unique"] = unique
+        summary["unique_pct"] = (unique / n_rows * 100.0) if n_rows else 0.0
+
+        zeros = (df_num == 0).sum(numeric_only=True)
+        summary["zeros"] = zeros
+        summary["zeros_pct"] = (zeros / n_rows * 100.0) if n_rows else 0.0
+
+        summary["variance"] = df_num.var()
+        summary["skew"] = df_num.skew()
+        summary["kurtosis"] = df_num.kurtosis()
+
+        q1 = df_num.quantile(0.25)
+        q3 = df_num.quantile(0.75)
+        iqr = q3 - q1
+        summary["iqr"] = iqr
+
+        lower = q1 - 1.5 * iqr
+        upper = q3 + 1.5 * iqr
+        outlier_mask = df_num.lt(lower) | df_num.gt(upper)
+        outlier_count = outlier_mask.sum()
+        summary["outlier_count"] = outlier_count
+        summary["outlier_pct"] = (outlier_count / n_rows * 100.0) if n_rows else 0.0
 
         return summary
+
+    def correlations(self, method: str = "pearson") -> pd.DataFrame:
+        df_num = self.df[self.numeric_columns]
+        return df_num.corr(method=method)
