@@ -30,11 +30,11 @@ class ReportGenerator:
             plt.hist(clean_series, bins=30)
             plt.xlabel(series.name or "")
             plt.ylabel("Frequency")
-            plt.title(f"Distribution of {series.name}")
+            plt.title(str(series.name or "column"))
         else:
             plt.boxplot(clean_series, vert=True)
             plt.ylabel(series.name or "")
-            plt.title(f"Boxplot of {series.name}")
+            plt.title(str(series.name or "column"))
 
         buff = BytesIO()
         plt.savefig(buff, bbox_inches="tight", format="png")
@@ -91,7 +91,7 @@ class ReportGenerator:
 
     def _top_missing_columns_html(self, column_profile: pd.DataFrame, top_n: int = 10) -> str:
         if column_profile is None or column_profile.empty:
-            return "<div class='muted'>No columns.</div>"
+            return "<div class='muted'>—</div>"
         top = (
             column_profile.sort_values(["missing_pct", "missing_count"], ascending=False)
             .head(top_n)
@@ -118,7 +118,7 @@ class ReportGenerator:
         miss = sample.isna().to_numpy(dtype=float)
         return self._heatmap_data_uri(
             miss,
-            title=f"Missing values heatmap (first {len(sample)} rows)",
+            title=f"Missing values ({len(sample)} rows)",
             xlabel="columns",
             ylabel="rows",
             xticklabels=[str(c) for c in sample.columns],
@@ -129,7 +129,7 @@ class ReportGenerator:
 
     def _column_overview_html(self, column_profile: pd.DataFrame) -> str:
         if column_profile is None or column_profile.empty:
-            return "<div class='muted'>No columns.</div>"
+            return "<div class='muted'>—</div>"
         header = (
             "<tr>"
             "<th>Column name <button class='mini-btn' onclick='sortOverview(0)'>Sort</button> <button class='mini-btn' onclick='filterOverview(0)'>Filter</button></th>"
@@ -147,7 +147,7 @@ class ReportGenerator:
             if bool(r.get("high_cardinality")) and str(r.get("role")) in {"identifier", "text", "categorical"}:
                 warn = (
                     "<div class='muted' style='margin-top:6px'>"
-                    "High cardinality column — likely identifier. Not suitable for standard categorical analysis."
+                    "Many distinct values."
                     "</div>"
                 )
             body.append(
@@ -159,7 +159,7 @@ class ReportGenerator:
                 f"<td data-sort='{int(r['n_unique'])}'>{int(r['n_unique'])}</td>"
                 f"<td>{html.escape(str(r['example_values']))}</td>"
                 f"<td><textarea class='inline-comment' id='col-comment-{html.escape(str(r['column']))}' "
-                f"placeholder='Your notes...'></textarea></td>"
+                "placeholder=''></textarea></td>"
                 "</tr>"
             )
         return "<div class='table-scroll overview'><table id='column-overview-table' class='corr compact-table'>" + header + "".join(body) + "</table></div>"
@@ -168,12 +168,12 @@ class ReportGenerator:
         self, corr: pd.DataFrame, top_n: int = 8
     ) -> tuple[str | None, str, str]:
         if corr is None or corr.empty or corr.shape[0] < 2:
-            return None, "<div class='muted'>Not enough numerical columns for correlations.</div>", ""
+            return None, "<div class='muted'>Need at least 2 numeric columns.</div>", ""
 
         mat = corr.to_numpy(dtype=float)
         heat_uri = self._heatmap_data_uri(
             mat,
-            title="Correlation heatmap (Pearson)",
+            title="Pearson correlation",
             xlabel="columns",
             ylabel="columns",
             xticklabels=[str(c) for c in corr.columns],
@@ -191,7 +191,7 @@ class ReportGenerator:
                     pairs.append((cols[i], cols[j], float(v)))
 
         if not pairs:
-            return heat_uri, "<div class='muted'>No finite correlations.</div>", ""
+            return heat_uri, "<div class='muted'>No correlations computed.</div>", ""
 
         pairs_sorted = sorted(pairs, key=lambda x: x[2])
         top_neg = pairs_sorted[:top_n]
@@ -211,14 +211,13 @@ class ReportGenerator:
                 f"<div class='table-scroll'><table class='corr'>{header}{''.join(body)}</table></div>"
             )
 
-        return heat_uri, _pairs_html("Top positive correlations", top_pos), _pairs_html("Top negative correlations", top_neg)
+        return heat_uri, _pairs_html("Highest r", top_pos), _pairs_html("Lowest r", top_neg)
 
     def _col_stats_table_html(self, summary: pd.DataFrame, column: str) -> str:
         if column not in summary.index:
             return "<div class='muted'>No stats available.</div>"
 
         s = summary.loc[column]
-        # Keep a stable, readable order
         preferred = [
             "count",
             "mean",
@@ -256,25 +255,6 @@ class ReportGenerator:
                 f"<tr><td class='k'>{html.escape(str(k))}</td><td class='v'>{html.escape(v_str)}</td></tr>"
             )
         return "<table class='stats'><tbody>" + "".join(rows) + "</tbody></table>"
-
-    def _corr_table_html(self, corr: pd.DataFrame, max_cols: int = 30) -> str:
-        if corr.empty:
-            return "<div class='muted'>No correlations (no numerical columns).</div>"
-
-        # Large matrices get unreadable fast; cap for UI safety.
-        if corr.shape[1] > max_cols:
-            corr = corr.iloc[:max_cols, :max_cols]
-            note = f"<div class='muted'>Showing first {max_cols} columns only.</div>"
-        else:
-            note = ""
-
-        # Render as simple HTML table (no heavy JS).
-        header = "<tr><th></th>" + "".join(f"<th>{html.escape(str(c))}</th>" for c in corr.columns) + "</tr>"
-        body_rows = []
-        for idx, row in corr.iterrows():
-            tds = "".join(f"<td>{'' if pd.isna(x) else f'{x:.3f}'}</td>" for x in row.values)
-            body_rows.append(f"<tr><th>{html.escape(str(idx))}</th>{tds}</tr>")
-        return note + "<div class='table-scroll'><table class='corr'>" + header + "".join(body_rows) + "</table></div>"
 
     def _categorical_stats_table_html(self, df: pd.DataFrame, column: str) -> str:
         s = df[column]
@@ -319,7 +299,7 @@ class ReportGenerator:
             return None
         plt.figure(figsize=(10, 4))
         plt.bar([str(x) for x in vc.index], vc.values)
-        plt.title(f"Top {top_n} categories: {column}")
+        plt.title(column)
         plt.xticks(rotation=60, ha="right", fontsize=8)
         plt.ylabel("count")
         plt.tight_layout()
@@ -338,12 +318,11 @@ class ReportGenerator:
         column_profile: pd.DataFrame,
         summary: pd.DataFrame,
         corr_pearson: pd.DataFrame | None = None,
-        corr_spearman: pd.DataFrame | None = None,
         report_name: str = "report.html",
     ) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        title = "EDA"
+        title = "Report"
         parts: list[str] = []
 
         parts.append(
@@ -590,50 +569,48 @@ class ReportGenerator:
     <div class="header">
       <h1>{html.escape(title)}</h1>
       <div class="header-actions">
-        <button class="save-btn" onclick="saveReport()">Zapisz raport</button>
-        <div class="meta">Rows: {len(df)} &nbsp;|&nbsp; Numerical columns: {len(numerical_columns)} &nbsp;|&nbsp; Categorical columns: {len(categorical_columns)}</div>
+        <button class="save-btn" onclick="saveReport()">Download HTML</button>
+        <div class="meta">{len(df)} rows · {len(numerical_columns)} numeric · {len(categorical_columns)} categorical</div>
       </div>
     </div>
 """
         )
 
-        parts.append("<div class='section'><h2>Dataset Overview</h2>")
+        parts.append("<div class='section'><h2>Overview</h2>")
         parts.append(self._dataset_overview_html(df))
         parts.append("</div>")
 
-        parts.append("<div class='section'><h2>Column overview</h2>")
+        parts.append("<div class='section'><h2>Columns</h2>")
         parts.append(self._column_overview_html(column_profile))
         parts.append("</div>")
 
         miss_uri = self._missingness_heatmap_uri(df)
-        parts.append("<div class='section'><h2>Missing values</h2>")
+        parts.append("<div class='section'><h2>Missing</h2>")
         if miss_uri:
             parts.append(f"<div class='plot'><img alt='Missing values heatmap' src='{miss_uri}' /></div>")
         parts.append("<div style='height:12px'></div>")
-        parts.append("<div class='muted'>Top missing columns</div>")
+        parts.append("<div class='muted'>Most empty columns</div>")
         parts.append(self._top_missing_columns_html(column_profile))
         parts.append("</div>")
 
         if datetime_columns:
-            parts.append("<div class='section'><h2>Datetime Analysis</h2><div class='cols'>")
+            parts.append("<div class='section'><h2>Dates</h2><div class='cols'>")
             for col in datetime_columns:
                 dt = pd.to_datetime(df[col], errors="coerce")
                 if dt.dropna().empty:
                     continue
                 dt_min = dt.min()
                 dt_max = dt.max()
-                yearly = dt.dt.to_period("Y").value_counts().sort_index()
                 monthly = dt.dt.to_period("M").value_counts().sort_index()
 
-                # simple trends plot: monthly counts (cap points for readability)
                 ser = monthly.copy()
                 if len(ser) > 60:
                     ser = ser.tail(60)
                 plt.figure(figsize=(10, 3.5))
                 plt.plot([str(p) for p in ser.index], ser.values)
-                plt.title(f"Records over time (monthly): {col}")
+                plt.title(col)
                 plt.xticks(rotation=60, ha="right", fontsize=8)
-                plt.ylabel("records")
+                plt.ylabel("count")
                 plt.tight_layout()
                 buff = BytesIO()
                 plt.savefig(buff, bbox_inches="tight", format="png")
@@ -651,7 +628,7 @@ class ReportGenerator:
                 )
             parts.append("</div></div>")
 
-        parts.append("<div class='section'><h2>Numerical Analysis</h2><div class='cols'>")
+        parts.append("<div class='section'><h2>Numeric</h2><div class='cols'>")
 
         for col in numerical_columns:
             hist_uri = self._plot_data_uri(df[col], kind="hist")
@@ -660,12 +637,12 @@ class ReportGenerator:
             hist_html = (
                 f"<img alt='Histogram {html.escape(col)}' src='{hist_uri}' />"
                 if hist_uri
-                else "<div class='muted'>Histogram not found.</div>"
+                else "<div class='muted'>No values.</div>"
             )
             box_html = (
                 f"<img alt='Boxplot {html.escape(col)}' src='{box_uri}' />"
                 if box_uri
-                else "<div class='muted'>Boxplot not found.</div>"
+                else "<div class='muted'>No values.</div>"
             )
 
             parts.append(
@@ -678,8 +655,8 @@ class ReportGenerator:
         </div>
         {self._col_stats_table_html(summary, col)}
         <div class="comment-box">
-          <label for="comment-{html.escape(col)}">Komentarz użytkownika</label>
-          <textarea id="comment-{html.escape(col)}" placeholder="Dodaj swoje wnioski lub uwagi do kolumny {html.escape(col)}..."></textarea>
+          <label for="comment-{html.escape(col)}">Comment</label>
+          <textarea id="comment-{html.escape(col)}" placeholder=""></textarea>
         </div>
       </div>
 """
@@ -687,7 +664,7 @@ class ReportGenerator:
 
         parts.append("</div></div>")
 
-        parts.append("<div class='section'><h2>Categorical Analysis</h2><div class='cols'>")
+        parts.append("<div class='section'><h2>Categorical</h2><div class='cols'>")
         for col in categorical_columns:
             bar_uri = self._categorical_bar_uri(df, col, top_n=10)
             bar_html = (
@@ -702,8 +679,8 @@ class ReportGenerator:
         {bar_html}
         {self._categorical_stats_table_html(df, col)}
         <div class="comment-box">
-          <label for="comment-{html.escape(col)}">Komentarz użytkownika</label>
-          <textarea id="comment-{html.escape(col)}" placeholder="Dodaj swoje wnioski lub uwagi do kolumny {html.escape(col)}..."></textarea>
+          <label for="comment-{html.escape(col)}">Comment</label>
+          <textarea id="comment-{html.escape(col)}" placeholder=""></textarea>
         </div>
       </div>
 """
@@ -721,54 +698,14 @@ class ReportGenerator:
             parts.append(top_neg_html)
             parts.append("</div>")
 
-        missing_cells = int(df.isna().sum().sum())
-        dup_rows = int(df.duplicated().sum())
-        id_like = int((column_profile["role"] == "identifier").sum()) if column_profile is not None else 0
-
-        skewed_items = []
-        if summary is not None and (not summary.empty) and ("skew" in summary.columns):
-            for idx, v in summary["skew"].dropna().abs().sort_values(ascending=False).head(3).items():
-                skewed_items.append((str(idx), float(v)))
-
-        outlier_items = []
-        if summary is not None and (not summary.empty) and ("outlier_pct" in summary.columns):
-            for idx, v in summary["outlier_pct"].dropna().sort_values(ascending=False).head(3).items():
-                outlier_items.append((str(idx), float(v)))
-
-        strong_corr = []
-        if corr_pearson is not None and not corr_pearson.empty:
-            cols = list(corr_pearson.columns)
-            pairs = []
-            for i in range(len(cols)):
-                for j in range(i + 1, len(cols)):
-                    v = corr_pearson.iloc[i, j]
-                    if pd.notna(v):
-                        pairs.append((cols[i], cols[j], float(v)))
-            strong_corr = sorted(pairs, key=lambda x: abs(x[2]), reverse=True)[:3]
-
-        parts.append("<div class='section'><h2>Key Findings</h2><ul>")
-        parts.append(f"<li>Dataset contains <b>{missing_cells}</b> missing cells and <b>{dup_rows}</b> duplicate rows.</li>")
-        parts.append(f"<li><b>{id_like}</b> columns appear to be identifiers (high-cardinality / ID-like) and should typically be excluded from modeling and correlation analysis.</li>")
-        if skewed_items:
-            parts.append(
-                "<li>Most skewed numerical columns: "
-                + ", ".join(f"<b>{html.escape(c)}</b> (|skew|={v:.2f})" for c, v in skewed_items)
-                + ".</li>"
-            )
-        if outlier_items:
-            parts.append(
-                "<li>Columns with most outliers (Tukey): "
-                + ", ".join(f"<b>{html.escape(c)}</b> ({v:.2f}%)" for c, v in outlier_items)
-                + ".</li>"
-            )
-        if strong_corr:
-            parts.append(
-                "<li>Strongest correlations: "
-                + ", ".join(f"<b>{html.escape(a)}</b>–<b>{html.escape(b)}</b> (r={v:.2f})" for a, b, v in strong_corr)
-                + ".</li>"
-            )
-        parts.append("<li>Dataset likely requires preprocessing (handling missing values, identifier removal, encoding categoricals) before ML usage.</li>")
-        parts.append("</ul></div>")
+        parts.append(
+            """
+<div class="section">
+  <h2>Notes</h2>
+  <textarea id="general-comment" style="width:100%; min-height:120px; padding:10px; border-radius:10px; border:1px solid #243044; background:rgba(0,0,0,0.2); color:#e5e7eb; font-size:13px; font-family:inherit; resize:vertical; box-sizing:border-box" placeholder=""></textarea>
+</div>
+"""
+        )
 
         parts.append(
             """
@@ -782,7 +719,6 @@ function restoreSavedComments() {
 }
 
 function saveReport() {
-  // textarea values are not reflected in outerHTML; write them back before saving
   const docClone = document.documentElement.cloneNode(true);
   const srcTextareas = document.querySelectorAll("textarea");
   const dstTextareas = docClone.querySelectorAll("textarea");
@@ -837,7 +773,7 @@ function sortOverview(colIdx) {
 function filterOverview(colIdx) {
   const table = document.getElementById("column-overview-table");
   if (!table) return;
-  const query = prompt("Filter value for selected column (leave empty to reset):", "");
+  const query = prompt("Filter (empty = show all):", "");
   const rows = Array.from(table.querySelectorAll("tr")).slice(1);
   if (query === null || query.trim() === "") {
     for (const r of rows) r.style.display = "";
@@ -850,7 +786,6 @@ function filterOverview(colIdx) {
   }
 }
 
-// Ensure saved HTML rehydrates comment values on open
 restoreSavedComments();
 </script>
 """

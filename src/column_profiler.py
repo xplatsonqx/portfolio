@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import warnings
 
 import pandas as pd
@@ -40,7 +39,6 @@ def _looks_boolean(s: pd.Series) -> bool:
 
 
 def _try_parse_datetime(s: pd.Series) -> tuple[bool, pd.Series | None]:
-    # Sample to keep it fast on large datasets
     sample = s.dropna().astype(str).head(2000)
     if sample.empty:
         return False, None
@@ -76,7 +74,6 @@ def infer_role(s: pd.Series, col_name: str, n_rows: int) -> tuple[str, dict]:
     if pd.api.types.is_datetime64_any_dtype(s):
         return ROLE_DATETIME, hints
 
-    # Parse only when there is a datetime-like name hint to avoid noisy false checks.
     is_dt, _ = _try_parse_datetime(s) if hints["datetime_hint"] else (False, None)
     if is_dt:
         return ROLE_DATETIME, hints
@@ -86,16 +83,18 @@ def infer_role(s: pd.Series, col_name: str, n_rows: int) -> tuple[str, dict]:
     unique = int(s.nunique(dropna=True))
     unique_ratio = (unique / non_null) if non_null else 0.0
     hints["unique_ratio_non_null"] = unique_ratio
+    hints["n_unique"] = unique
 
     if pd.api.types.is_numeric_dtype(s):
-        # Heuristic: high-uniqueness integer-like columns are often identifiers
         is_int_like = pd.api.types.is_integer_dtype(s) or (s.dropna().astype(float) % 1 == 0).all()
         hints["is_int_like"] = bool(is_int_like)
+        if is_int_like and non_null and (unique <= 25 or unique_ratio <= 0.01):
+            return ROLE_CATEGORICAL, hints
+
         if unique_ratio >= 0.95 and (hints["id_hint"] or is_int_like):
             return ROLE_IDENTIFIER, hints
         return ROLE_NUMERICAL, hints
 
-    # object / string-like
     avg_len = _string_avg_len(s)
     hints["avg_len"] = avg_len
     if unique_ratio >= 0.95 or hints["id_hint"]:
@@ -118,7 +117,6 @@ def profile_columns(df: pd.DataFrame) -> pd.DataFrame:
         example_vals = s.dropna().head(3).tolist()
         example_vals = [str(v) for v in example_vals]
 
-        # High-cardinality warning for ID-like / text-like / extreme categorical
         high_cardinality = False
         if n_rows:
             unique_ratio_rows = n_unique / n_rows

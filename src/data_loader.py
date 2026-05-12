@@ -1,11 +1,9 @@
+from __future__ import annotations
+
+from pathlib import Path
 
 import pandas as pd
 
 
-class DataLoader:
-    def __init__(self, path: str, separator: str = ";"):
-        self.path = path
-        self.separator = separator
-
-    def load(self) -> pd.DataFrame:
-        return pd.read_csv(self.path, sep=self.separator, low_memory=False)
+def load_csv(path: str | Path, sep: str = ";") -> pd.DataFrame:
+    return pd.read_csv(path, sep=sep, low_memory=False)
